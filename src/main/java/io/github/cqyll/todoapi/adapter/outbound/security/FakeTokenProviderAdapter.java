@@ -1,26 +1,11 @@
 package io.github.cqyll.todoapi.adapter.outbound.security;
 
-import java.util.UUID;
-
 import io.github.cqyll.todoapi.application.port.outbound.TokenProviderPort;
 
 public class FakeTokenProviderAdapter implements TokenProviderPort {
 
 	@Override
-	public String createToken(UUID userId) {
-		return "TOKEN-" + userId.toString();
-	}
-
-	@Override
-	public boolean validateToken(String token) {
-		return token != null && token.startsWith("TOKEN-");
-	}
-
-	@Override
-	public UUID extractUserId(String token) {
-		if (!validateToken(token)) {
-			throw new IllegalArgumentException("Invalid token!");
-		}
-		return UUID.fromString(token.substring(6));
+	public String createToken(String subject) {
+		return "TOKEN-" + subject;
 	}
 }

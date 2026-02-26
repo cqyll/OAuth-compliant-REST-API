@@ -6,7 +6,7 @@ import io.github.cqyll.todoapi.application.port.outbound.PasswordHasherPort;
 import io.github.cqyll.todoapi.application.port.outbound.TokenProviderPort;
 import io.github.cqyll.todoapi.domain.User;
 import io.github.cqyll.todoapi.domain.Password;
-import io.github.cqyll.todoapi.dto.RegisterRequest;
+
 
 public class UserRegistrationService implements UserRegistrationUseCase {
 	private final UserRepositoryPort userRepository;
@@ -34,7 +34,7 @@ public class UserRegistrationService implements UserRegistrationUseCase {
 
 		userRepository.save(user);
 
-		return this.tokenProvider.createToken(user.getId());
+		return this.tokenProvider.createToken(user.getId().toString());
 	}
 
 	private void validateRegistrationPreconditions(String email, String rawPassword) {
