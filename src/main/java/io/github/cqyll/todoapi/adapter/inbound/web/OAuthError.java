@@ -1,5 +1,6 @@
 package io.github.cqyll.todoapi.adapter.inbound.web;
 
+@SuppressWarnings("serial")
 public final class OAuthError extends RuntimeException {
     private final String error;
     private final String description;
