@@ -1,109 +1,114 @@
 package io.github.cqyll.todoapi.dto;
 
-import java.util.Map;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class OAuthTokenRequest {
-    private String grantType;
-    private String clientId;
-    private String clientSecret;
-    private String username;
-    private String password;
-    private String refreshToken;
-    private String code;
-    private String scope;
-    private String redirectUri;
+import java.util.Locale;
+import java.util.Objects;
 
-    public OAuthTokenRequest() {
-    }
 
-    /**
-     * Creates an {@code OAuthTokenRequest} from parsed form parameters and client credentials.
-     *
-     * @param form parsed token request parameters
-     * @param clientId resolved client identifier
-     * @param clientSecret resolved client secret
-     * @return populated request DTO
-     */
-    public static OAuthTokenRequest from(Map<String, String> form, String clientId, String clientSecret) {
-        OAuthTokenRequest req = new OAuthTokenRequest();
-        req.setGrantType(form.get("grant_type"));
-        req.setUsername(form.get("username"));
-        req.setPassword(form.get("password"));
-        req.setRefreshToken(form.get("refresh_token"));
-        req.setCode(form.get("code"));
-        req.setScope(form.get("scope"));
-        req.setRedirectUri(form.get("redirect_uri"));
-        req.setClientId(clientId);
-        req.setClientSecret(clientSecret);
-        return req;
-    }
+/**
+ * DTO representing an OAuth 2.0 token request.
+ *
+ * <p>This DTO accepts fields that can come from
+ * application/x-www-form-urlencoded bodies and/or HTTP Basic Authorization header
+ * (client_id/client_secret can be supplied either way).</p>
+ */
+public final class OAuthTokenRequest {
+	private final String grantType;
+	// Client authentication (either via Basic auth header or request body)
+	private final String clientId;
+	private final String clientSecret;
 
-    public void validate() {
-        // Basic validation - client_id is required for all OAuth flows
-        if (clientId == null || clientId.isBlank()) {
-            throw new IllegalArgumentException("client_id is required");
-        }
+	private final String username;
+	private final String password;
+	private final String code;
+	private final String redirectUri;
+	private final String refreshToken;
+	private final String scope;
 
-        // Validate based on grant type
-        if (grantType == null) {
-            throw new IllegalArgumentException("grant_type is required");
-        }
+	@JsonCreator
+	public OAuthTokenRequest(
+			@JsonProperty("grant_type") String grantType,
+			@JsonProperty("client_id") String clientId,
+			@JsonProperty("client_secret") String clientSecret,
+			@JsonProperty("username") String username,
+			@JsonProperty("password") String password,
+			@JsonProperty("code") String code,
+			@JsonProperty("redirect_uri") String redirectUri,
+			@JsonProperty("refresh_token") String refreshToken,
+			@JsonProperty("scope") String scope
+			) {
+		this.grantType = normalizeGrantType(grantType);
 
-        switch (grantType) {
-            case "password":
-                if (username == null || username.isBlank()) {
-                    throw new IllegalArgumentException("username is required for password grant");
-                }
-                if (password == null || password.isBlank()) {
-                    throw new IllegalArgumentException("password is required for password grant");
-                }
-                break;
+		this.clientId = trimToNull(clientId);
+		this.clientSecret = trimToNull(clientSecret);
 
-            case "authorization_code":
-                if (code == null || code.isBlank()) {
-                    throw new IllegalArgumentException("code is required for authorization_code grant");
-                }
-                break;
+		this.username = trimToNull(username);
+		this.password = trimToNull(password);
 
-            case "refresh_token":
-                if (refreshToken == null || refreshToken.isBlank()) {
-                    throw new IllegalArgumentException("refresh_token is required for refresh_token grant");
-                }
-                break;
+		this.code = trimToNull(code);
+		this.redirectUri = trimToNull(redirectUri);
 
-            case "client_credentials":
-                // Only client_id and client_secret needed
-                break;
+		this.refreshToken = trimToNull(refreshToken);
 
-            default:
-                throw new IllegalArgumentException("Unsupported grant_type: " + grantType);
-        }
-    }
+		this.scope = trimToNull(scope);
+	}
 
-    public String getGrantType() { return grantType; }
-    public void setGrantType(String grantType) { this.grantType = grantType; }
+	public String getGrantType() { return grantType; }
+	public String getClientId() { return clientId; }
+	public String getClientSecret() { return clientSecret; }
+	public String getUsername() { return username; }
+	public String getPassword() { return password; }
+	public String getCode() { return code; }
+	public String getRedirectUri() { return redirectUri; }
+	public String getRefreshToken() { return refreshToken; }
+	public String getScope() { return scope; }
 
-    public String getClientId() { return clientId; }
-    public void setClientId(String clientId) { this.clientId = clientId; }
+	private static String normalizeGrantType(String raw) {
+		String v = trimToNull(raw);
+		return v == null ? null : v.toLowerCase(Locale.ROOT);
+	}
 
-    public String getClientSecret() { return clientSecret; }
-    public void setClientSecret(String clientSecret) { this.clientSecret = clientSecret; }
+	private static String trimToNull(String s) {
+		if (s == null) return null;
+		String t = s.trim();
+		return t.isEmpty() ? null : t;
+	}
 
-    public String getUsername() { return username; }
-    public void setUsername(String username) { this.username = username; }
+	@Override
+	public boolean equals(Object o) {
+		if (this == o) return true;
+		if (!(o instanceof OAuthTokenRequest)) return false;
+		OAuthTokenRequest other = (OAuthTokenRequest) o;
+		return Objects.equals(grantType, other.grantType)
+				&& Objects.equals(clientId, other.clientId)
+				&& Objects.equals(clientSecret, other.clientSecret)
+				&& Objects.equals(username, other.username)
+				&& Objects.equals(password, other.password)
+				&& Objects.equals(code, other.code)
+				&& Objects.equals(redirectUri, other.redirectUri)
+				&& Objects.equals(refreshToken, other.refreshToken)
+				&& Objects.equals(scope, other.scope);
+	}
 
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
+	@Override
+	public int hashCode() {
+		return Objects.hash(grantType, clientId, clientSecret, username, password, code, redirectUri, refreshToken, scope);
+	}
 
-    public String getRefreshToken() { return refreshToken; }
-    public void setRefreshToken(String refreshToken) { this.refreshToken = refreshToken; }
-
-    public String getCode() { return code; }
-    public void setCode(String code) { this.code = code; }
-
-    public String getScope() { return scope; }
-    public void setScope(String scope) { this.scope = scope; }
-
-    public String getRedirectUri() { return redirectUri; }
-    public void setRedirectUri(String redirectUri) { this.redirectUri = redirectUri; }
+	
+	// consider adding redaction helper, so toString can include redacted values for sensitive fields (e.g., clientSecret, password, refreshToken)
+	@Override
+	public String toString() {
+		return "OAuthTokenRequest{" +
+				"grantType='" + grantType + '\'' +
+				", clientId='" + clientId + '\'' +
+				", username='" + username + '\'' +
+				", code='" + code + '\'' +
+				", redirectUri='" + redirectUri + '\'' +
+				", refreshToken='" + refreshToken + '\'' +
+				", scope=" + scope +
+				'}';
+	}
 }

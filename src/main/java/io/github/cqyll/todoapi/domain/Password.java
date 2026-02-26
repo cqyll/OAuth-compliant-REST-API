@@ -22,6 +22,11 @@ public class Password {
 	public static Password fromHash(String hash) {
 		return new Password(hash);
 	}
+	
+	public static Password fromRaw(String rawPassword, PasswordHasherPort hasher) {
+		String hash = hasher.hash(rawPassword);
+		return new Password(hash);
+	}
 
 	private void validate(String hash) {
 		if (hash == null || hash.isBlank()) {
