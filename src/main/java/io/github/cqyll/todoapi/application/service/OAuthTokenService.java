@@ -1,86 +1,154 @@
 package io.github.cqyll.todoapi.application.service;
 
-import io.github.cqyll.todoapi.application.port.inbound.OAuthTokenUseCase;
-import io.github.cqyll.todoapi.application.port.outbound.TokenProviderPort;
-import io.github.cqyll.todoapi.domain.User;
-import io.github.cqyll.todoapi.dto.OAuthTokenRequest;
-import io.github.cqyll.todoapi.adapter.inbound.web.OAuthError;
-
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
+
+import io.github.cqyll.todoapi.adapter.inbound.web.OAuthError;
+import io.github.cqyll.todoapi.application.port.inbound.OAuthTokenUseCase;
+import io.github.cqyll.todoapi.application.port.outbound.OAuthClientRepositoryPort;
+import io.github.cqyll.todoapi.application.port.outbound.PasswordHasherPort;
+import io.github.cqyll.todoapi.domain.OAuthClient;
+import io.github.cqyll.todoapi.dto.OAuthTokenRequest;
+
 
 public class OAuthTokenService implements OAuthTokenUseCase {
-    private final BasicCredentialsAuthenticator basicAuth;
-    private final TokenProviderPort tokenProvider;
 
-    // Replace with ClientRepositoryPort later
-    private final String expectedClientId;
-    private final String expectedClientSecret;
-
-    public OAuthTokenService(
-            BasicCredentialsAuthenticator basicAuth,
-            TokenProviderPort tokenProvider,
-            String expectedClientId,
-            String expectedClientSecret
-    ) {
-        this.basicAuth = basicAuth;
-        this.tokenProvider = tokenProvider;
-        this.expectedClientId = expectedClientId;
-        this.expectedClientSecret = expectedClientSecret;
-    }
-
-    @Override
-    public Map<String, Object> token(OAuthTokenRequest req) {
-        // RFC 6749 required params
-        if (isBlank(req.getGrantType())) {
-            throw OAuthError.invalidRequest("grant_type is required");
-        }
-
-        // Validate client (token endpoint may require confidential client auth in many deployments).
-        if (isBlank(req.getClientId())) {
-            throw OAuthError.invalidClient("client authentication failed");
-        }
-        
-        // hard-coded clientId & clientSecret for demo purposes
-        // Constants set in `MainTest.java` must match `AppConfig.java` constructor args
-        if (!expectedClientId.equals(req.getClientId())
-                || !expectedClientSecret.equals(nullToEmpty(req.getClientSecret()))) {
-            throw OAuthError.invalidClient("client authentication failed");
-        }
-
-        // route by grant type
-        String grant = req.getGrantType();
-        if (!"password".equals(grant)) {
-            // currently only support password grants
-            throw OAuthError.unsupportedGrantType("grant_type not supported");
-        }
-
-        if (isBlank(req.getUsername()) || isBlank(req.getPassword())) {
-            throw OAuthError.invalidRequest("username and password are required for password grant");
-        }
-
-        final User user;
-        try {
-        	 user = basicAuth.authenticate(Map.of(
-                     "email", req.getUsername(),
-                     "password", req.getPassword()
-             ));
-        } catch (RuntimeException e) {
-        	throw OAuthError.invalidGrant("invalid resource owner credentials");
-        }
-       
-        if (!user.isActive()) {
-            throw OAuthError.invalidGrant("invalid resource owner credentials"); // invalid_grant for bad user creds / invalid grant usage.
-        }
-
-        String access = tokenProvider.createToken(user.getId());
-
-        return Map.of(
-                "access_token", access,
-                "token_type", "Bearer",
-                "expires_in", 3600
-        );
-    }
-
-    private static boolean isBlank(String s) { return s == null || s.isBlank(); }
-    private static String nullToEmpty(String s) { return s == null ? "" : s; }
+	public static final class GrantContext {
+		private final OAuthClient client;
+		private final Set<String> effectiveScopes;
+		
+		public GrantContext(OAuthClient client, Set<String> effectiveScopes) {
+			this.client = client;
+			this.effectiveScopes = effectiveScopes;
+		}
+		
+		public OAuthClient client() { return client; }
+		public Set<String> effectiveScopes() { return effectiveScopes; }
+	}
+	
+	// GrantType -> handler map
+	private final Map<OAuthClient.GrantType, TokenGrantHandler> handlers;
+	// client repo and hasher
+	private final OAuthClientRepositoryPort clientRepo;
+	private final PasswordHasherPort hasher;
+	
+	
+	public OAuthTokenService(
+			OAuthClientRepositoryPort clientRepo,
+			PasswordHasherPort hasher,
+			TokenGrantHandler...grantHandlers) {
+		this.clientRepo = clientRepo;
+		this.hasher = hasher;
+		
+		EnumMap<OAuthClient.GrantType, TokenGrantHandler> map = new EnumMap<>(OAuthClient.GrantType.class);
+		
+		for (TokenGrantHandler h : grantHandlers) {
+			if (h == null) continue;
+			OAuthClient.GrantType gt = h.supports();
+			if (gt == null) continue;
+		
+			TokenGrantHandler prev = map.putIfAbsent(gt, h);
+			if (prev != null) {
+				throw new IllegalStateException("Duplicate handler for " + gt);
+			}
+		}
+		this.handlers = Map.copyOf(map);
+	}
+	
+	public Map<String, Object> token(OAuthTokenRequest req) {
+		
+		// request shape validation
+		if (req == null) throw OAuthError.invalidRequest("request body is required");
+		
+		String grantRaw = requireNonBlankRequest(req.getGrantType(), "grant_type is required");
+		
+		// call client authentication helper
+		OAuthClient client = authenticateClient(req);
+		
+		// parse and validate GrantType (protocol-level)
+		OAuthClient.GrantType grant = OAuthClient.GrantType.fromString(grantRaw);
+		
+		if (grant == null) throw OAuthError.unsupportedGrantType("grant_type not supported");
+		
+		// client authentication
+		if (!client.getAllowedGrantTypes().contains(grant)) {
+			throw OAuthError.unauthorizedClient("client not authorized for this grant_type");
+		}
+		
+		Set<String> effectiveScopes = resolveEffectiveScopes(req, client);
+		TokenGrantHandler handler = handlers.get(grant);
+		if (handler == null) throw OAuthError.unsupportedGrantType("grant_type not supported");
+		
+		return handler.handle(new GrantContext(client, effectiveScopes), req);
+	}
+	
+	
+	/**
+	 * this helper authenticates client and avoids leaking details in error messages -- as per OAuth spec.
+	 * @param req
+	 * @return
+	 */
+	private OAuthClient authenticateClient(OAuthTokenRequest req) {
+		String clientId = requireNonBlankClient(req.getClientId());
+		
+		OAuthClient client = clientRepo.findByClientId(clientId)
+				.orElseThrow(() -> OAuthError.invalidClient("client authentication failed"));
+		
+		if (!client.isEnabled()) { throw OAuthError.invalidClient("client authentication failed"); }
+		
+		if (client.getClientType() == OAuthClient.ClientType.CONFIDENTIAL) {
+			String secret = req.getClientSecret();
+			if (secret == null || secret.isBlank()) {
+				throw OAuthError.invalidClient("client authentication failed");
+			}
+			
+			String hash = client.getClientSecretHash();
+			if (hash == null || hash.isBlank() || !hasher.matches(secret, hash)) {
+				throw OAuthError.invalidClient("client authentication failed");
+			}
+		}
+		return client;
+	}
+	
+	
+	private Set<String> resolveEffectiveScopes(OAuthTokenRequest req, OAuthClient client) {
+		final Set<String> requestedScopes;
+		try {
+			requestedScopes = OAuthClient.normalizeScopeTokens(req.getScope());
+		} catch (IllegalArgumentException e) {
+			throw OAuthError.invalidScope("invalid scope value");
+		}
+		
+		// RFC 6749 Section 3.3; omitted/blank scope parameter -> return server defined default scopes
+		if (requestedScopes.isEmpty()) return client.getAllowedScopes();
+		
+		// partial grant policy: granted = requested \cap allowed
+		Set<String> granted = new LinkedHashSet<>(requestedScopes);
+		granted.retainAll(client.getAllowedScopes());
+		
+		// nothing requested is permitted
+		if (granted.isEmpty()) {
+			throw OAuthError.invalidScope("requested scope is not allowed for this client");
+		}
+		
+		
+		// Collections.unmodifiableSet(granted) would return a view, use Set.copyOf() instead
+		return Set.copyOf(granted);
+		
+	}
+	
+	private static String requireNonBlankRequest(String v, String msg) {
+		if (v == null || v.isBlank()) throw OAuthError.invalidRequest(msg);
+		return v;
+	}
+	
+	private static String requireNonBlankClient(String v) {
+		if (v == null || v.isBlank()) throw OAuthError.invalidClient("client authentication failed");
+		return v;
+	}
+	
+	
 }
