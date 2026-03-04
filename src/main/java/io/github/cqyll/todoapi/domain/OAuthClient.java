@@ -256,14 +256,10 @@ public class OAuthClient {
      * - lowercases
      * - removes duplicates (order-preserving)
      * - validates token characters
-     */
-    public static Set<String> normalizeScopeTokens(Iterable<String> rawScopes) {
-        return Collections.unmodifiableSet(normalizeScopes(rawScopes));
-    }
-    
+     */ 
     public static Set<String> normalizeScopeTokens(String scopeRaw) {
-    	if (scopeRaw == null || scopeRaw.isBlank()) return Set.of();
-    	return normalizeScopeTokens(List.of(scopeRaw.trim().split("\\s+")));
+    	if ((scopeRaw == null) || scopeRaw.isBlank()) return Set.of();
+    	return Set.copyOf(normalizeScopes(List.of(scopeRaw.trim().split("\\s+"))));
     }
     
     // internal normalize (mutable) used by builder
@@ -273,8 +269,8 @@ public class OAuthClient {
         LinkedHashSet<String> out = new LinkedHashSet<>();
         for (String raw : rawScopes) {
             String tok = requireNonBlank(raw, "scope token must not be blank")
-            		.trim().
-            		toLowerCase(Locale.ROOT);
+            		.trim()
+            		.toLowerCase(Locale.ROOT);
             validateScopeToken(tok);
             out.add(tok);
         }
