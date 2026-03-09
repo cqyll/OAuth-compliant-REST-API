@@ -99,6 +99,11 @@ public class OAuthClient {
     public String getDescription() { return description; }
     public boolean isEnabled() { return enabled; }
     public long getCreatedAtEpochMillis() { return createdAtEpochMillis; }
+    
+    public Metadata getMetadata() {
+        return Metadata.of(clientName, clientUri, logoUri, policyUri, description);
+    }
+    
 
    
     public boolean allowsScopes(Set<String> requestedScopesNormalized) {
@@ -171,7 +176,7 @@ public class OAuthClient {
 
     public static final class Metadata {
         private final String clientName;
-        private final String clientUri;
+		private final String clientUri;
         private final String logoUri;
         private final String policyUri;
         private final String description;
@@ -191,6 +196,26 @@ public class OAuthClient {
         public static Metadata empty() {
             return new Metadata(null, null, null, null, null);
         }
+        
+        public String getClientName() {
+			return clientName;
+		}
+
+		public String getClientUri() {
+			return clientUri;
+		}
+
+		public String getLogoUri() {
+			return logoUri;
+		}
+
+		public String getPolicyUri() {
+			return policyUri;
+		}
+
+		public String getDescription() {
+			return description;
+		}
     }
 
     // internals
