@@ -31,11 +31,11 @@ import java.util.Map;
 public final class LoginController implements HttpHandler {
 	private static final ObjectMapper mapper = new ObjectMapper();
 	
-	private final OAuthTokenUseCase tokenUseCase;
+	private final OAuthTokenUseCase useCase;
 	
 	public LoginController(OAuthTokenUseCase tokenUseCase) {
 		if (tokenUseCase == null) throw new IllegalArgumentException("tokenUseCase is required");
-		this.tokenUseCase = tokenUseCase;
+		this.useCase = tokenUseCase;
 	}
 	
 	@Override
@@ -75,7 +75,7 @@ public final class LoginController implements HttpHandler {
 			String clientSecret = body.client_secret;
 			
 			// build OAuthTokenRequest (DTO for OAuth layer)
-			// this is needed since /login is just a user convenience endpoint. internally, it uses OAuth password grant
+			// this is needed since /login is just a user convenience endpoint. internally, it uses OAuth password grant.
 			OAuthTokenRequest req = new OAuthTokenRequest(
 					"password", // grant_type
 					clientId,
@@ -88,7 +88,7 @@ public final class LoginController implements HttpHandler {
 					scope);
 			
 			// delegate to app layer
-			Map<String, Object> out = tokenUseCase.token(req);
+			Map<String, Object> out = useCase.token(req);
 			
 			// return response JSON (success)
 			writeJson(ex, 200, out);
