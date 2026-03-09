@@ -9,16 +9,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
+import io.github.cqyll.todoapi.application.port.inbound.UserRegistrationUseCase;
 import io.github.cqyll.todoapi.application.service.UserRegistrationService;
 import io.github.cqyll.todoapi.dto.RegisterRequest;
 
 public class UserController implements HttpHandler {
 
-	private final UserRegistrationService registrationService;
+	private final UserRegistrationUseCase registrationService;
 	private static final ObjectMapper mapper = new ObjectMapper();
 
 
-	public UserController(UserRegistrationService registrationService) {
+	public UserController(UserRegistrationUseCase registrationService) {
 		this.registrationService = registrationService;
 	}
 
