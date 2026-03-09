@@ -21,6 +21,7 @@ import io.github.cqyll.todoapi.application.service.OAuthTokenService;
 import io.github.cqyll.todoapi.application.service.PasswordGrantHandler;
 import io.github.cqyll.todoapi.application.service.TokenGrantHandler;
 import io.github.cqyll.todoapi.application.service.UserRegistrationService;
+import io.github.cqyll.todoapi.application.port.inbound.UserRegistrationUseCase;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -56,7 +57,7 @@ public final class AppConfig {
                         passwordGrantHandler
                 );
 
-        UserRegistrationService userRegistrationService =
+        UserRegistrationUseCase userRegistrationUseCase =
                 new UserRegistrationService(userRepository, passwordHasher, tokenProvider);
 
         // ===== Controllers =====
@@ -67,7 +68,7 @@ public final class AppConfig {
                 new OAuthController(oAuthTokenUseCase);
 
         UserController userController =
-                new UserController(userRegistrationService);
+                new UserController(userRegistrationUseCase);
 
         LoginController loginController =
                 new LoginController(oAuthTokenUseCase);
