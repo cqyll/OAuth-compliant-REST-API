@@ -38,9 +38,13 @@ public final class ClientCredentialsGrantHandler implements TokenGrantHandler {
         if (client.getClientType() != OAuthClient.ClientType.CONFIDENTIAL) {
             throw OAuthError.unauthorizedClient("public clients cannot use client_credentials grant");
         }
-
-        String access = tokens.createToken(client.getClientId());
-
+        
+        // these are the same based on semantics of client credentials grants
+        String subject = client.getClientId();
+        String clientId = client.getClientId();
+        
+        String access = tokens.createAccessToken(subject, clientId, ctx.effectiveScopes());
+        
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("access_token", access);
         out.put("token_type", "Bearer");

@@ -107,7 +107,6 @@ public final class OAuthTokenRequest {
 				", username='" + username + '\'' +
 				", code='" + code + '\'' +
 				", redirectUri='" + redirectUri + '\'' +
-				", refreshToken='" + refreshToken + '\'' +
 				", scope=" + scope +
 				'}';
 	}
