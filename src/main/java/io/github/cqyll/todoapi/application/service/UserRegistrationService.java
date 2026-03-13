@@ -11,19 +11,16 @@ import io.github.cqyll.todoapi.domain.Password;
 public class UserRegistrationService implements UserRegistrationUseCase {
 	private final UserRepositoryPort userRepository;
 	private final PasswordHasherPort passwordHasher;
-	private final TokenProviderPort tokenProvider;
 
 	public UserRegistrationService(
 			UserRepositoryPort userRepository,
-			PasswordHasherPort passwordHasher,
-			TokenProviderPort tokenProvider) {
+			PasswordHasherPort passwordHasher) {
 		this.userRepository = userRepository;
 		this.passwordHasher = passwordHasher;
-		this.tokenProvider = tokenProvider;
 	}
 
 	@Override
-	public String register(String email, String name, String rawPassword) {
+	public User register(String email, String name, String rawPassword) {
 
 		validateRegistrationPreconditions(email, rawPassword);
 
@@ -34,7 +31,7 @@ public class UserRegistrationService implements UserRegistrationUseCase {
 
 		userRepository.save(user);
 
-		return this.tokenProvider.createToken(user.getId().toString());
+		return user;
 	}
 
 	private void validateRegistrationPreconditions(String email, String rawPassword) {

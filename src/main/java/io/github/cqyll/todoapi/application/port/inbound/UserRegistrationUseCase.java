@@ -1,6 +1,7 @@
 package io.github.cqyll.todoapi.application.port.inbound;
 
+import io.github.cqyll.todoapi.domain.User;
 
 public interface UserRegistrationUseCase {
-	String register(String email, String name, String rawPassword);
+	User register(String email, String name, String rawPassword);
 }
